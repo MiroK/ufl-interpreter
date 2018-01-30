@@ -1,0 +1,7 @@
+* iUFL
+  iUFL is a compiler of UFL expressions to Python functions which can 
+  be evaluated in n-tuples representing points in $R^n$. This design 
+  has a major limitation in a fact that the compiled expression can no 
+  longer interfact with UFL/Dolfin nor, in general, be compiled again. 
+  This is most evident with derivatives, e.g. `grad(expr_eval(u+v))` does 
+  not work. I plan to fix this as part of compiling to dolfin.Expressions
