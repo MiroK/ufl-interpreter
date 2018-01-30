@@ -366,3 +366,16 @@ if __name__ == '__main__':
     # FIXME: wrapping as Expression, eval_cell?, cpp Expression
 
     # READ SICC: interpreters
+
+    # ComponentTensor, Div, as_matrix, as_vector
+
+    # HOWTO
+    # In [4]: f = Expression('x[0]', element=V.ufl_element())
+
+    # In [5]: import ufl
+
+    # In [6]: ufl.algorithms.estimate_degrees.estimate_total_polynomial_degree(f)
+    # Out[6]: 1
+
+    # In [7]: ufl.algorithms.extract_unique_elements(f)
+    # Out[7]: (FiniteElement('Lagrange', triangle, 1),)
