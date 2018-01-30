@@ -273,6 +273,29 @@ def expr_eval(expression):
             return values
         return eval_grad
 
+    if isinstance(expression, ufl.differentiation.Curl):
+        arg = expression.ufl_operands[0]
+
+        if arg.ufl_shape == ():
+            # scalar <- R grad (expr)
+            f = lambda x, arg=arg: np.dot(np.array([[0, 1.], [-1., 0]]),
+                                          expr_eval(grad(arg))(x))
+
+        elif arg.ufl_shape == (2, ):
+            # vector <- R:grad(expr)            
+            f= lambda x, arg=arg: np.trace(np.dot(np.array([[0, 1.], [-1., 0]]),
+                                                  expr_eval(grad(arg))(x)))
+
+        else:
+            assert arg.ufl_shape == (3, )
+            # The usual stuff
+            f = lambda x, arg=arg: (
+                lambda G: np.array([G[1, 2]-G[2, 1],
+                                    G[2, 0]-G[0, 2],
+                                    G[0, 1]-G[1, 0]]))(expr_eval(grad(arg))(x))
+        return f
+
+
     # Well that's it for now
     raise ValueError('Unsupported type %s', type(expression))
 
@@ -304,16 +327,29 @@ if __name__ == '__main__':
     u = Constant(3)
 
     mesh = UnitSquareMesh(10, 10)
+    V = FunctionSpace(mesh, 'CG', 1)
+    v = interpolate(Expression('x[0]+x[1]', degree=1), V)
+    
+    print expr_eval(curl(v))((0.5, 0.5))
+
     V = VectorFunctionSpace(mesh, 'CG', 2)
     f = Expression(('x[0]*x[0]', '2*x[1]*x[0]'), degree=2)
     v = interpolate(f, V)
 
-    print expr_eval(inv(sym(grad(v)))+Constant(((1, 0), (0, 1))))((0.5, 0.5))
+    print expr_eval(curl(v))((0.5, 0.5))
 
-    
+    #print expr_eval(Constant(((1, 2), (3, 4)))[0, 0])((0.5, 0.5))
+    #print expr_eval(inv(sym(grad(v)))+Constant(((1, 0), (0, 1))))((0.5, 0.5))
+
     A = Constant(((1, 0), (2, 3)))
     B = Constant(((2, 0), (2, 3)))
     v = Constant((1, 0))
+
+    mesh = UnitCubeMesh(3, 3, 3)
+    V = VectorFunctionSpace(mesh, 'CG', 2)
+    f = interpolate(Expression(('-x[1]', 'x[0]', 'x[2]'), degree=1), V)
+
+    print expr_eval(curl(f))((0.5, 0.5, 0.5))
 
     #print expr_eval(v[0])((0.5, 0.5))
     #print expr_eval(A[0, 0])((0.5, 0.5))
