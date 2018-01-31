@@ -254,7 +254,7 @@ def lambdify(expression, mesh=None):
         
         # It is mandatory that FFC has generated deriv eval code
         assert not dolfin.parameters['form_compiler']['no-evaluate_basis_derivatives']
-
+        print 'Diff', type(expression)
         # Primitives
         if isinstance(operand, dolfin.Function):
             # We are about to take the derivative so it better make sense
@@ -264,6 +264,7 @@ def lambdify(expression, mesh=None):
         # Needs mesh!
         elif isinstance(operand, dolfin.Expression) or hasattr(expression, 'is_CExpr'):
             # We are about to take the derivative so it better make sense
+            print 'Degree', iufl.get_element(operand).degree()
             assert iufl.get_element(operand).degree() >= 1
             
             return differentiation.eval_grad_expr(operand, mesh)
