@@ -2,27 +2,11 @@ import differentiation
 import iufl
 
 from ufl.conditional import LE, GE, LT, GT, EQ, NE
+import scipy.special as sp
 import numpy as np
 import dolfin
 import math
 import ufl
-
-# Representation of ufl nodes that are MathFunctions
-# FIXME: Bessel functions are missing
-FUNCTION_MAP = {ufl.mathfunctions.Sin:   math.sin,
-                ufl.mathfunctions.Cos:   math.cos,
-                ufl.mathfunctions.Sqrt:  math.sqrt,
-                ufl.mathfunctions.Exp:   math.exp,
-                ufl.mathfunctions.Ln:    math.log,
-                ufl.mathfunctions.Tan:   math.tan,
-                ufl.mathfunctions.Sinh:  math.sinh,
-                ufl.mathfunctions.Cosh:  math.cosh,
-                ufl.mathfunctions.Tanh:  math.tanh,
-                ufl.mathfunctions.Asin:  math.asin,
-                ufl.mathfunctions.Acos:  math.acos,
-                ufl.mathfunctions.Atan:  math.atan,
-                ufl.mathfunctions.Atan2: math.atan2,
-                ufl.mathfunctions.Erf:   math.erf}
 
 
 def lambdify(expression, mesh=None):
@@ -69,7 +53,7 @@ def lambdify(expression, mesh=None):
     if isinstance(expression, ufl.algebra.Product):
         args = expression.ufl_operands
         first, second = args[0], args[1]
-        return lambda x, firs=first, second=second:\
+        return lambda x, first=first, second=second:\
             lambdify(first, mesh)(x) * lambdify(second, mesh)(x)
 
     ##################################################################
@@ -77,7 +61,19 @@ def lambdify(expression, mesh=None):
     ##################################################################
     if isinstance(expression, ufl.mathfunctions.MathFunction):
         return lambda x, expression=expression:\
-            FUNCTION_MAP[type(expression)](lambdify(expression.ufl_operands[0], mesh)(x)) 
+            FUNCTION_MAP_ONE_ARG[type(expression)](lambdify(expression.ufl_operands[0], mesh)(x))
+
+    if isinstance(expression, (ufl.mathfunctions.BesselI, ufl.mathfunctions.BesselY,
+                               ufl.mathfunctions.BesselJ, ufl.mathfunctions.BesselK)):
+
+        return lambda x, expr=expression:(
+            (
+                lambda nu, z: FUNCTION_MAP_TWO_ARG[type(expr)][int(nu) == float(nu)](nu, z)
+            )(iufl.icompile(expr.ufl_operands[0], mesh)(x),
+              iufl.icompile(expr.ufl_operands[1], mesh)(x)))
+        # Compile the first arg, this should be the order so we evaluate
+        # it to see it is int or not
+        first_c = iufl.icompile(first, mesh)
 
     ##################################################################
     # Tensor algebra
@@ -311,7 +307,29 @@ def extract_diff_function(arg, nderivs=1):
         return arg, nderivs
 
     return extract_diff_function(arg.ufl_operands[0], nderivs+1)
-    
+
+
+# Representation of ufl nodes that are MathFunctions of one argument
+FUNCTION_MAP_ONE_ARG = {ufl.mathfunctions.Sin:   math.sin,
+                        ufl.mathfunctions.Cos:   math.cos,
+                        ufl.mathfunctions.Sqrt:  math.sqrt,
+                        ufl.mathfunctions.Exp:   math.exp,
+                        ufl.mathfunctions.Ln:    math.log,
+                        ufl.mathfunctions.Tan:   math.tan,
+                        ufl.mathfunctions.Sinh:  math.sinh,
+                        ufl.mathfunctions.Cosh:  math.cosh,
+                        ufl.mathfunctions.Tanh:  math.tanh,
+                        ufl.mathfunctions.Asin:  math.asin,
+                        ufl.mathfunctions.Acos:  math.acos,
+                        ufl.mathfunctions.Atan:  math.atan,
+                        ufl.mathfunctions.Atan2: math.atan2,
+                        ufl.mathfunctions.Erf:   math.erf}
+
+# Representation of ufl nodes that are bessel foo, for NO int arg and INT arg
+FUNCTION_MAP_TWO_ARG = {ufl.mathfunctions.BesselI: (sp.iv, sp.iv),
+                        ufl.mathfunctions.BesselY: (sp.yv, sp.yn),
+                        ufl.mathfunctions.BesselJ: (sp.jv, sp.jn),
+                        ufl.mathfunctions.BesselK: (sp.kv, sp.kn)}
 
 # ----------------------------------------------------------------------------------------
 

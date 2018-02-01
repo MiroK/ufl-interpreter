@@ -2,13 +2,15 @@ from ufl.algorithms.estimate_degrees import estimate_total_polynomial_degree
 from ufl.algorithms import extract_unique_elements
 from ufl.corealg.traversal import traverse_unique_terminals
 from dolfin import (FiniteElement, VectorElement, TensorElement, MixedElement,
-                    Function)
+                    Function, Constant)
 from cexpr import build_cexpr
 import lambdas
 
 
 def icompile(expression, mesh=None, family='Discontinuous Lagrange'):
     '''Expression to CEexpresion'''
+
+    print expression
     
     element = get_element(expression)
     # Here the choice is made to represent everything in a DG space
@@ -16,8 +18,6 @@ def icompile(expression, mesh=None, family='Discontinuous Lagrange'):
     cell = element.cell()
     degree = element.degree()#get_degreee(expression)  # Of output
 
-    print shape
-    
     element = construct_element(family, cell, degree, shape)
     
     if mesh is None: mesh = get_mesh(expression)
@@ -27,9 +27,13 @@ def icompile(expression, mesh=None, family='Discontinuous Lagrange'):
 
                             
 def get_element(expr):
-    return extract_unique_elements(expr)[0]
+    try:
+        return extract_unique_elements(expr)[0]
+    except IndexError:
+        # This typically happens with numbers
+        return get_element(Constant(expr))
 
-                            
+    
 def get_degreee(expr):
     return estimate_total_polynomial_degree(expr)
 
@@ -77,9 +81,16 @@ if __name__ == '__main__':
                                  'x[0]+x[1]',
                                  'x[0]*x[1]'), degree=2), V)
 
+    print icompile(Constant(2))(0.5, 0.5)
+    
     #f = icompile(2*u+sin(u))
     #print f(0.5, 0.5)
-
+    X = FunctionSpace(mesh, 'CG', 1)
+    x = interpolate(Constant(1), X)
+    
+    g = icompile(bessel_I(1, x))
+    print g(0.2, 0.3)
+    
     f0 = icompile(div(grad(v0) + grad(v1)))
     #f = grad(2*v0) + grad(v1)
 
