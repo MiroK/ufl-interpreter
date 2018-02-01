@@ -91,12 +91,13 @@ if __name__ == '__main__':
     g1 = interpolate(Expression('x[0]-x[1]', element=W.ufl_element()), W)
 
 
-    f = outer(grad(g0+g1), grad(g1*g0))
-    A = icompile(f)(0.5, 0.5).reshape((2, 2))
+    f = sym(outer(grad(g0+g1), grad(g1*g0)))
+    A = icompile(f)
 
-    w = icompile(eigw(f))(0.5, 0.5)
-    v = icompile(eigv(f))(0.5, 0.5).reshape((2, 2))
+    w = icompile(eigw(A))(0.5, 0.5)
+    v = icompile(eigv(A))(0.5, 0.5).reshape((2, 2))
 
+    A = A(0.5, 0.5).reshape((2, 2))
     for wi, vi in zip(w, v):
         print A.dot(vi) - wi*vi
     
