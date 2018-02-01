@@ -67,13 +67,11 @@ def lambdify(expression, mesh=None):
                                ufl.mathfunctions.BesselJ, ufl.mathfunctions.BesselK)):
 
         return lambda x, expr=expression:(
-            (
+            (# Compile the first arg, this should be the order so we evaluate
+             # it to see it is int or not and dispatch to right function
                 lambda nu, z: FUNCTION_MAP_TWO_ARG[type(expr)][int(nu) == float(nu)](nu, z)
             )(iufl.icompile(expr.ufl_operands[0], mesh)(x),
               iufl.icompile(expr.ufl_operands[1], mesh)(x)))
-        # Compile the first arg, this should be the order so we evaluate
-        # it to see it is int or not
-        first_c = iufl.icompile(first, mesh)
 
     ##################################################################
     # Tensor algebra
@@ -295,18 +293,6 @@ def extract_index(index):
     '''UFL index to int or list of int'''
     index = map(int, index.indices())
     return index.pop() if len(index) == 1 else tuple(index)
-
-
-def extract_diff_function(arg, nderivs=1):
-    '''
-    Get the function to be differentatied along with the number of times 
-    this is to be done.
-    '''
-    assert isinstance(arg, (ufl.differentiation.Grad, dolfin.Function))
-    if isinstance(arg, dolfin.Function):
-        return arg, nderivs
-
-    return extract_diff_function(arg.ufl_operands[0], nderivs+1)
 
 
 # Representation of ufl nodes that are MathFunctions of one argument

@@ -64,6 +64,7 @@ def construct_element(family, cell, degree, shape=()):
 
 
 if __name__ == '__main__':
+    from operators import eigw, eigv
     from dolfin import *
     parameters['form_compiler']['no-evaluate_basis_derivatives'] = False
 
@@ -81,21 +82,32 @@ if __name__ == '__main__':
                                  'x[0]+x[1]',
                                  'x[0]*x[1]'), degree=2), V)
 
-    print icompile(Constant(2))(0.5, 0.5)
+    # print icompile(Constant(2))(0.5, 0.5)
     
     #f = icompile(2*u+sin(u))
     #print f(0.5, 0.5)
-    X = FunctionSpace(mesh, 'CG', 1)
-    x = interpolate(Constant(1), X)
+    W = FunctionSpace(mesh, 'CG', 1)
+    g0 = interpolate(Expression('x[0]+2*x[1]', element=W.ufl_element()), W)
+    g1 = interpolate(Expression('x[0]-x[1]', element=W.ufl_element()), W)
+
+
+    f = outer(grad(g0+g1), grad(g1*g0))
+    A = icompile(f)(0.5, 0.5).reshape((2, 2))
+
+    w = icompile(eigw(f))(0.5, 0.5)
+    v = icompile(eigv(f))(0.5, 0.5).reshape((2, 2))
+
+    for wi, vi in zip(w, v):
+        print A.dot(vi) - wi*vi
     
-    g = icompile(bessel_I(1, x))
-    print g(0.2, 0.3)
+    #g = icompile(bessel_I(1, x))
+    #print g(0.2, 0.3)
     
-    f0 = icompile(div(grad(v0) + grad(v1)))
+    # f0 = icompile(div(grad(v0) + grad(v1)))
     #f = grad(2*v0) + grad(v1)
 
     #f0 = icompile(grad(outer(f, f)))
-    print f0(0.23, 0.123), f0.ufl_shape
+    # print f0(0.23, 0.123), f0.ufl_shape
     #print f0(0.223, 0.124)
     #print f0(0.123, 0.123)
 
