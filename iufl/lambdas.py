@@ -1,6 +1,7 @@
-from ufl.conditional import LE, GE, LT, GT, EQ, NE
 import differentiation
 import iufl
+
+from ufl.conditional import LE, GE, LT, GT, EQ, NE
 import numpy as np
 import dolfin
 import math
@@ -238,15 +239,6 @@ def lambdify(expression, mesh=None):
             lambdify(true_v, mesh)(x) if lambdify(cond, mesh)(x) else lambdify(false_v, mesh)(x)
 
     ##################################################################
-    # Indexing (limited)
-    ##################################################################
-    if isinstance(expression, ufl.indexed.Indexed):
-        indexed, index = expression.ufl_operands
-
-        return lambda x, indexed=indexed, index=index:\
-            lambdify(indexed, mesh)(x)[extract_index(index)]
-    
-    ##################################################################
     # Differentation (limited)
     ##################################################################
     if isinstance(expression, ufl.differentiation.Grad):
@@ -254,7 +246,6 @@ def lambdify(expression, mesh=None):
         
         # It is mandatory that FFC has generated deriv eval code
         assert not dolfin.parameters['form_compiler']['no-evaluate_basis_derivatives']
-        print 'Diff', type(expression)
         # Primitives
         if isinstance(operand, dolfin.Function):
             # We are about to take the derivative so it better make sense
@@ -264,7 +255,6 @@ def lambdify(expression, mesh=None):
         # Needs mesh!
         elif isinstance(operand, dolfin.Expression) or hasattr(expression, 'is_CExpr'):
             # We are about to take the derivative so it better make sense
-            print 'Degree', iufl.get_element(operand).degree()
             assert iufl.get_element(operand).degree() >= 1
             
             return differentiation.eval_grad_expr(operand, mesh)
@@ -272,27 +262,33 @@ def lambdify(expression, mesh=None):
         else:
             return differentiation.eval_grad_expr(iufl.icompile(operand, mesh), mesh)
 
-    # if isinstance(expression, ufl.differentiation.Curl):
-    #     arg = expression.ufl_operands[0]
+    if isinstance(expression, ufl.differentiation.Curl):
+        arg = expression.ufl_operands[0]
+        # For simple types we can rely on grad
+        if isinstance(arg, (dolfin.Function, dolfin.Expression)) or hasattr(arg, 'is_CExpr'):
+            return differentiation.eval_curl(arg, mesh)
+        # Some composite
+        else:
+            return differentiation.eval_curl(iufl.icompile(arg, mesh), mesh)
 
-    #     if arg.ufl_shape == ():
-    #         # scalar <- R grad (expr)
-    #         f = lambda x, arg=arg: np.dot(np.array([[0, 1.], [-1., 0]]),
-    #                                       lambdify(dolfin.grad(arg))(x))
+    if isinstance(expression, ufl.differentiation.Div):
+        arg = expression.ufl_operands[0]
+        # For simple types we can rely on grad
+        if isinstance(arg, (dolfin.Function, dolfin.Expression)) or hasattr(arg, 'is_CExpr'):
+            return differentiation.eval_div(arg, mesh)
+        # Some composite
+        else:
+            return differentiation.eval_div(iufl.icompile(arg, mesh), mesh)
+        
+    ##################################################################
+    # Indexing (limited)
+    ##################################################################
+    if isinstance(expression, ufl.indexed.Indexed):
+        indexed, index = expression.ufl_operands
 
-    #     elif arg.ufl_shape == (2, ):
-    #         # vector <- R:grad(expr)            
-    #         f= lambda x, arg=arg: np.trace(np.dot(np.array([[0, 1.], [-1., 0]]),
-    #                                               lambdify(dolfin.grad(arg))(x)))
-
-    #     else:
-    #         assert arg.ufl_shape == (3, )
-    #         # The usual stuff
-    #         f = lambda x, arg=arg: (
-    #             lambda G: np.array([G[1, 2]-G[2, 1],
-    #                                 G[2, 0]-G[0, 2],
-    #                                 G[0, 1]-G[1, 0]]))(lambdify(dolfin.grad(arg))(x))
-    #     return f
+        return lambda x, indexed=indexed, index=index:\
+            lambdify(indexed, mesh)(x)[extract_index(index)]
+    
 
 
     # Well that's it for now

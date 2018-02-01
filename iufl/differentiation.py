@@ -4,7 +4,7 @@ import iufl
 
 
 def eval_grad_foo(foo):
-    '''Exact derivatives of function'''
+    '''Exact gradient of function'''
 
     def evaluate(x, foo=foo):
         x = np.fromiter(x, dtype=float)
@@ -42,8 +42,10 @@ def eval_grad_foo(foo):
 
 
 def eval_grad_expr(foo, mesh):
-    '''Derivatives of polyn fit of foo'''
-    assert mesh is not None
+    '''Gradient of polyn fit of foo'''
+
+    assert mesh is not None, 'Compiling requires mesh'
+    
     # The idea is to compute df  as sum c_k dphi_k    
     def evaluate(x, foo=foo, mesh=mesh):
         x = np.fromiter(x, dtype=float)
@@ -99,3 +101,57 @@ def eval_grad_expr(foo, mesh):
 
         return values
     return evaluate    
+
+
+def eval_curl(arg, mesh):
+    '''Curl of simple (i.e. not UFL composite)'''
+    # This is not the most efficient, but curl is defined in terms of curl
+    grad = iufl.icompile(dolfin.grad(arg), mesh)
+    if arg.ufl_shape == ():
+        # scalar -> R grad (expr) = vector
+        return lambda x, g=grad: (lambda G: np.array([G[1], -G[0]]))(g(x))
+
+    if arg.ufl_shape == (2, ):
+        # vector -> div(R expr) = scalar
+        # NOTE: I don't want to reshape grad to 2x2 and index then
+        # so this is vector indexing
+        return lambda x, g=grad: (lambda G: G[1]-G[2])(g(x))
+
+    if arg.ufl_shape == (3, ):
+        # The usual stuff
+        return lambda x, g=grad: (lambda G: np.array([G[5]-G[7], G[6]-G[2], G[1]-G[3]]))(g(x))
+    
+    assert False
+
+    
+def eval_div(arg, mesh):
+    '''Div of simple (i.e. not UFL composite)'''
+    # This is not the most efficient, but curl is defined in terms of curl
+    grad_ = dolfin.grad(arg)
+    grad = iufl.icompile(grad_, mesh)
+
+    print '?', arg.ufl_shape
+    # Consistency with UFL behavior
+    if len(arg.ufl_shape) == 0:
+        return lambda x, g=grad: g(x)
+    # Vector
+    if len(arg.ufl_shape) == 1:
+        n = arg[0]
+        assert n in (2, 3)
+
+        if n == 2:
+            return lambda x, g=grad: (lambda G: G[0]+G[3])(g(x))
+        else:
+            return lambda x, g=grad: (lambda G: G[0]+G[4]+G[8])(g(x))
+    # Tensors, rank > 1
+    assert len(grad_.ufl_shape) == len(arg.ufl_shape) + 1
+    # I think the general definition of div is tr grad which mounts to
+    # grad : I with identity over the last two indices
+    out_shape, id_shape = grad_.ufl_shape[:-2], grad_.ufl_shape[-2:]
+    # Build the identity 'matrix'
+    identity = [1 if i == j else 0 for i in range(id_shape[0]) for j in range(id_shape[1])]
+
+    return lambda x, g=grad, I=identity, N=np.prod(out_shape):(
+        lambda G, I=I: np.array([np.inner(Gi, I) for Gi in G])
+        )(g(x).reshape((N, -1)))
+
