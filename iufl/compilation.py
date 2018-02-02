@@ -16,6 +16,7 @@ def icompile(expression, mesh=None, family='Discontinuous Lagrange'):
     # Here the choice is made to represent everything in a DG space
     shape = expression.ufl_shape
     cell = element.cell()
+    # FIXME: to this properly!
     degree = element.degree()#get_degreee(expression)  # Of output
 
     element = construct_element(family, cell, degree, shape)
@@ -60,6 +61,7 @@ def construct_element(family, cell, degree, shape=()):
 
         return MixedElement([component]*nfirst)
 
+    
 # --------------------------------------------------------------------
 
 
@@ -89,7 +91,6 @@ if __name__ == '__main__':
     W = FunctionSpace(mesh, 'CG', 1)
     g0 = interpolate(Expression('x[0]+2*x[1]', element=W.ufl_element()), W)
     g1 = interpolate(Expression('x[0]-x[1]', element=W.ufl_element()), W)
-
 
     f = sym(outer(grad(g0+g1), grad(g1*g0)))
     A = icompile(f)

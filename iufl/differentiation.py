@@ -1,6 +1,6 @@
 import numpy as np
 import dolfin
-import iufl
+import compilation
 
 
 def eval_grad_foo(foo):
@@ -50,7 +50,7 @@ def eval_grad_expr(foo, mesh):
     def evaluate(x, foo=foo, mesh=mesh):
         x = np.fromiter(x, dtype=float)
 
-        ufl_element = iufl.get_element(foo)
+        ufl_element = compilation.get_element(foo)
         # NOTE: this is here to make evaluating dofs simpler. Too lazy
         # now to handle Hdiv and what not
         assert ufl_element.family() in ('Lagrange', 'Discontinuous Lagrange')
@@ -106,7 +106,7 @@ def eval_grad_expr(foo, mesh):
 def eval_curl(arg, mesh):
     '''Curl of simple (i.e. not UFL composite)'''
     # This is not the most efficient, but curl is defined in terms of curl
-    grad = iufl.icompile(dolfin.grad(arg), mesh)
+    grad = compilation.icompile(dolfin.grad(arg), mesh)
     if arg.ufl_shape == ():
         # scalar -> R grad (expr) = vector
         return lambda x, g=grad: (lambda G: np.array([G[1], -G[0]]))(g(x))
@@ -128,7 +128,7 @@ def eval_div(arg, mesh):
     '''Div of simple (i.e. not UFL composite)'''
     # This is not the most efficient, but curl is defined in terms of curl
     grad_ = dolfin.grad(arg)
-    grad = iufl.icompile(grad_, mesh)
+    grad = compilation.icompile(grad_, mesh)
 
     print '?', arg.ufl_shape
     # Consistency with UFL behavior

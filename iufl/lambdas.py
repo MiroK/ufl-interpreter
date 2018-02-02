@@ -1,5 +1,5 @@
 import differentiation
-import iufl
+import compilation
 
 from ufl.conditional import LE, GE, LT, GT, EQ, NE
 import scipy.special as sp
@@ -8,6 +8,8 @@ import dolfin
 import math
 import ufl
 
+# Make sure FFC generates code for derivatives
+dolfin.parameters['form_compiler']['no-evaluate_basis_derivatives'] = False
 
 def lambdify(expression, mesh=None):
     '''Compile UFL expression into lambda taking spatial point.'''
@@ -70,8 +72,8 @@ def lambdify(expression, mesh=None):
             (# Compile the first arg, this should be the order so we evaluate
              # it to see it is int or not and dispatch to right function
                 lambda nu, z: FUNCTION_MAP_TWO_ARG[type(expr)][int(nu) == float(nu)](nu, z)
-            )(iufl.icompile(expr.ufl_operands[0], mesh)(x),
-              iufl.icompile(expr.ufl_operands[1], mesh)(x)))
+            )(compilation.icompile(expr.ufl_operands[0], mesh)(x),
+              compilation.icompile(expr.ufl_operands[1], mesh)(x)))
 
     ##################################################################
     # Tensor algebra
@@ -249,12 +251,12 @@ def lambdify(expression, mesh=None):
         # Needs mesh!
         elif isinstance(operand, dolfin.Expression) or hasattr(expression, 'is_CExpr'):
             # We are about to take the derivative so it better make sense
-            assert iufl.get_element(operand).degree() >= 1
+            assert compilation.get_element(operand).degree() >= 1
             
             return differentiation.eval_grad_expr(operand, mesh)
         # Composite
         else:
-            return differentiation.eval_grad_expr(iufl.icompile(operand, mesh), mesh)
+            return differentiation.eval_grad_expr(compilation.icompile(operand, mesh), mesh)
 
     if isinstance(expression, ufl.differentiation.Curl):
         arg = expression.ufl_operands[0]
@@ -263,7 +265,7 @@ def lambdify(expression, mesh=None):
             return differentiation.eval_curl(arg, mesh)
         # Some composite
         else:
-            return differentiation.eval_curl(iufl.icompile(arg, mesh), mesh)
+            return differentiation.eval_curl(compilation.icompile(arg, mesh), mesh)
 
     if isinstance(expression, ufl.differentiation.Div):
         arg = expression.ufl_operands[0]
@@ -272,7 +274,7 @@ def lambdify(expression, mesh=None):
             return differentiation.eval_div(arg, mesh)
         # Some composite
         else:
-            return differentiation.eval_div(iufl.icompile(arg, mesh), mesh)
+            return differentiation.eval_div(compilation.icompile(arg, mesh), mesh)
         
     ##################################################################
     # Indexing (limited)

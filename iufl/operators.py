@@ -1,7 +1,7 @@
 from dolfin import VectorElement, TensorElement
 from scipy.linalg import svdvals, eigvals, eig
 import numpy as np
-import iufl, cexpr
+import compilation, cexpr
 
 
 def eigw(expr, mesh=None):
@@ -10,7 +10,7 @@ def eigw(expr, mesh=None):
     matrix. NOTE: only real part
     '''
     if not hasattr(expr, 'is_CExpr'):
-        return eigw(iufl.icompile(expr, None))
+        return eigw(compilation.icompile(expr, None))
     
     # For CExpr of right shape we can proceed
     assert len(expr.ufl_shape) == 2, 'Matrix valued expression expected'
@@ -37,7 +37,7 @@ def eigw(expr, mesh=None):
 def eigv(expr, mesh=None):
     '''Matrix of eigenvalues[they form ROWS] of square matrix'''
     if not hasattr(expr, 'is_CExpr'):
-        return eigv(iufl.icompile(expr, None))
+        return eigv(compilation.icompile(expr, None))
     
     # For CExpr of right shape we can proceed
     assert len(expr.ufl_shape) == 2, 'Matrix valued expression expected'
