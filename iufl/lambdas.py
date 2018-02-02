@@ -58,6 +58,18 @@ def lambdify(expression, mesh=None):
         return lambda x, first=first, second=second:\
             lambdify(first, mesh)(x) * lambdify(second, mesh)(x)
 
+    if isinstance(expression, ufl.algebra.Product):
+        args = expression.ufl_operands
+        first, second = args[0], args[1]
+        return lambda x, first=first, second=second:\
+            lambdify(first, mesh)(x) * lambdify(second, mesh)(x)
+
+    if isinstance(expression, ufl.algebra.Power):
+        args = expression.ufl_operands
+        first, second = args[0], args[1]
+        return lambda x, first=first, second=second:\
+            lambdify(first, mesh)(x)**lambdify(second, mesh)(x)
+
     ##################################################################
     # Functions
     ##################################################################
