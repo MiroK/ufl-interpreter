@@ -17,7 +17,7 @@ def icompile(expression, mesh=None, family='Discontinuous Lagrange'):
     shape = expression.ufl_shape
     cell = element.cell()
     # FIXME: to this properly!
-    degree = element.degree()#get_degreee(expression)  # Of output
+    degree = get_degreee(expression)  # Of output
 
     element = construct_element(family, cell, degree, shape)
     
