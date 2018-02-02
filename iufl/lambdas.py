@@ -55,12 +55,10 @@ def lambdify(expression, mesh=None):
     if isinstance(expression, ufl.algebra.Product):
         args = expression.ufl_operands
         first, second = args[0], args[1]
-        return lambda x, first=first, second=second:\
-            lambdify(first, mesh)(x) * lambdify(second, mesh)(x)
 
-    if isinstance(expression, ufl.algebra.Product):
-        args = expression.ufl_operands
-        first, second = args[0], args[1]
+        # NOTE: * is polymorphic and acts as matvec with those arguments
+        if len(first.ufl_shape) == 2: return lambdify(dolfin.dot(first, second), mesh)
+        
         return lambda x, first=first, second=second:\
             lambdify(first, mesh)(x) * lambdify(second, mesh)(x)
 
@@ -69,6 +67,7 @@ def lambdify(expression, mesh=None):
         first, second = args[0], args[1]
         return lambda x, first=first, second=second:\
             lambdify(first, mesh)(x)**lambdify(second, mesh)(x)
+
 
     ##################################################################
     # Functions

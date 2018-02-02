@@ -22,11 +22,11 @@ def eval_grad_foo(foo):
         # grad grad grad ... ntime is stored in
         nslots = np.prod(shape)
 
-        # Array for values with derivatives of all basis functions. 4 * element dim
+        # Array for values with derivatives of all basis functions
         values = np.zeros(nslots*el.space_dimension(), dtype=float)
-        # Compute all 2nd order derivatives
+        # Compute all derivatives
         el.evaluate_basis_derivatives_all(1, values, x, coordinate_dofs, cell.orientation())
-        # Reshape such that colums are [d/dxx, d/dxy, d/dyx, d/dyy]
+        # Reshape such that colums are [d/dxx, d/dxy, d/dyx, d/dyy, ...]
         values = values.reshape((-1, nslots))
 
         # Get expansion coefs on cell. Alternative to this is f.restrict(...)
@@ -69,11 +69,11 @@ def eval_grad_expr(foo, mesh):
         # grad grad grad ... ntime is stored in
         nslots = np.prod(shape)
 
-        # Array for values with derivatives of all basis functions. 4 * element dim
+        # Array for values with derivatives of all basis functions
         values = np.zeros(nslots*el.space_dimension(), dtype=float)
-        # Compute all 2nd order derivatives
+        # Compute all derivatives
         el.evaluate_basis_derivatives_all(1, values, x, coordinate_dofs, cell.orientation())
-        # Reshape such that colums are [d/dxx, d/dxy, d/dyx, d/dyy]
+        # Reshape such that colums are [d/dxx, d/dxy, d/dyx, d/dyy...]
         values = values.reshape((-1, nslots))
 
         # Get expansion coefs on cell.
