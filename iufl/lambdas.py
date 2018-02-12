@@ -295,18 +295,62 @@ def lambdify(expression, mesh=None):
 
         return lambda x, indexed=indexed, index=index:\
             lambdify(indexed, mesh)(x)[extract_index(index)]
+
+    if isinstance(expression, ufl.tensors.ListTensor):
+        comps = [compilation.icompile(arg, mesh) for arg in expression.ufl_operands]
+        return lambda x, comps=comps: np.array([f(x) for f in comps])
+
+    if isinstance(expression, ufl.tensors.ComponentTensor):
+        # The first thing better be Indexed
+        indexed, free = expression.ufl_operands
+        assert isinstance(indexed, ufl.indexed.Indexed)
+        # What, slicing ...
+        indexed, indices = indexed.ufl_operands
+        # Compile the function to be indexed        
+        indexed = compilation.icompile(indexed, mesh)
+        # Figure out how to slice it
+        shape = indexed.ufl_shape
+        index = extract_slice(shape, indices, free)
+        # With this the input would have to be reshaped, sliced and collapsed
+        # The idea is to avold this
+        index = np.arange(np.prod(shape)).reshape(shape)[index].flatten()
+
+        return lambda x, f=indexed, index=index: f(x)[index]
     
-
-
     # Well that's it for now
     raise ValueError('Unsupported type %s', type(expression))
 
+######################################################################
+# AUXILIARY MATHOD/DATA
+######################################################################
 
 def extract_index(index):
     '''UFL index to int or list of int'''
-    index = map(int, index.indices())
-    return index.pop() if len(index) == 1 else tuple(index)
+    if isinstance(index, ufl.core.multiindex.FixedIndex):
+        return [int(index)]
 
+    if isinstance(index, ufl.core.multiindex.Index):
+        return [index.count()]
+    
+    elif isinstance(index, ufl.core.multiindex.MultiIndex):
+        return sum((extract_index(i) for i in index.indices()), [])
+
+    raise ValueError('Unable to extract index from %s', type(index))
+
+
+def extract_slice(shape, indices, free):
+    '''
+    Slice of values with given shape determined by free index in indices.
+    '''
+    assert isinstance(indices, ufl.core.multiindex.MultiIndex)
+    assert isinstance(indices, ufl.core.multiindex.MultiIndex)
+    assert len(free) < len(indices)
+
+    indices = extract_index(indices)
+    free = extract_index(free)
+
+    return [slice(shape[i]) if index in free else index
+            for i, index in enumerate(indices)]
 
 # Representation of ufl nodes that are MathFunctions of one argument
 FUNCTION_MAP_ONE_ARG = {ufl.mathfunctions.Sin:   math.sin,
