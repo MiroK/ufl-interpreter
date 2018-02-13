@@ -10,7 +10,7 @@ import lambdas
 def icompile(expression, mesh=None, family='Discontinuous Lagrange'):
     '''Expression to CEexpresion'''
 
-    print expression
+    print 'icompiling', expression, type(expression)
     
     element = get_element(expression)
     # Here the choice is made to represent everything in a DG space
@@ -41,7 +41,7 @@ def get_degreee(expr):
 
 def get_mesh(expr):
     for arg in traverse_unique_terminals(expr):
-        print 'Arg', arg, type(arg)
+        # print 'Arg', arg, type(arg)
         if isinstance(arg, Function):
             return arg.function_space().mesh()
     return None

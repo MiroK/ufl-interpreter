@@ -13,6 +13,7 @@ dolfin.parameters['form_compiler']['no-evaluate_basis_derivatives'] = False
 
 def lambdify(expression, mesh=None):
     '''Compile UFL expression into lambda taking spatial point.'''
+    # NOTE: everything is flat
     ##################################################################
     # Terminals
     ##################################################################
@@ -32,7 +33,7 @@ def lambdify(expression, mesh=None):
         return lambda x, expression=expression: np.eye(expression.ufl_shape[0])
 
     if isinstance(expression, ufl.constantvalue.Zero):
-        return lambda x, expression: np.zeros(expression.ufl_shape)
+        return lambda x, expression=expression: np.zeros(expression.ufl_shape)
 
     if isinstance(expression, ufl.geometry.SpatialCoordinate): # Idenity
         return lambda x: np.array(x) if not isinstance(x, np.ndarray) else x
@@ -67,7 +68,6 @@ def lambdify(expression, mesh=None):
         first, second = args[0], args[1]
         return lambda x, first=first, second=second:\
             lambdify(first, mesh)(x)**lambdify(second, mesh)(x)
-
 
     ##################################################################
     # Functions
@@ -291,14 +291,19 @@ def lambdify(expression, mesh=None):
     # Indexing (limited)
     ##################################################################
     if isinstance(expression, ufl.indexed.Indexed):
-        indexed, index = expression.ufl_operands
+        indexed_, index = expression.ufl_operands
 
-        return lambda x, indexed=indexed, index=index:\
-            lambdify(indexed, mesh)(x)[extract_index(index)]
+        indexed = compilation.icompile(indexed_, mesh)
+        shape = indexed.ufl_shape
+        index = extract_index(index)
+        index = flat_index(shape, index)
+        return lambda x, indexed=indexed, index=index: np.array(indexed(x).item(index))
 
     if isinstance(expression, ufl.tensors.ListTensor):
+
         comps = [compilation.icompile(arg, mesh) for arg in expression.ufl_operands]
-        return lambda x, comps=comps: np.array([f(x) for f in comps])
+        return lambda x, comps=comps: np.array([f(x).reshape(f.ufl_shape) for f in comps])
+
 
     if isinstance(expression, ufl.tensors.ComponentTensor):
         # The first thing better be Indexed
@@ -306,16 +311,15 @@ def lambdify(expression, mesh=None):
         assert isinstance(indexed, ufl.indexed.Indexed)
         # What, slicing ...
         indexed, indices = indexed.ufl_operands
-        # Compile the function to be indexed        
+        # Compile the function to be indexed
         indexed = compilation.icompile(indexed, mesh)
+
         # Figure out how to slice it
         shape = indexed.ufl_shape
         index = extract_slice(shape, indices, free)
-        # With this the input would have to be reshaped, sliced and collapsed
-        # The idea is to avold this
-        index = np.arange(np.prod(shape)).reshape(shape)[index].flatten()
+        index = flat_index(shape, index)
 
-        return lambda x, f=indexed, index=index: f(x)[index]
+        return lambda x, f=indexed, index=index, shape=expression.ufl_shape: (f(x)[index]).reshape(shape)
     
     # Well that's it for now
     raise ValueError('Unsupported type %s', type(expression))
@@ -327,13 +331,13 @@ def lambdify(expression, mesh=None):
 def extract_index(index):
     '''UFL index to int or list of int'''
     if isinstance(index, ufl.core.multiindex.FixedIndex):
-        return [int(index)]
+        return int(index)
 
     if isinstance(index, ufl.core.multiindex.Index):
-        return [index.count()]
+        return index.count()
     
     elif isinstance(index, ufl.core.multiindex.MultiIndex):
-        return sum((extract_index(i) for i in index.indices()), [])
+        return tuple(map(extract_index, index.indices()))
 
     raise ValueError('Unable to extract index from %s', type(index))
 
@@ -349,8 +353,13 @@ def extract_slice(shape, indices, free):
     indices = extract_index(indices)
     free = extract_index(free)
 
-    return [slice(shape[i]) if index in free else index
-            for i, index in enumerate(indices)]
+    return tuple(range(shape[i]) if index in free else index
+                 for i, index in enumerate(indices))
+
+
+def flat_index(shape, index):
+    return np.ravel_multi_index(index, shape)
+
 
 # Representation of ufl nodes that are MathFunctions of one argument
 FUNCTION_MAP_ONE_ARG = {ufl.mathfunctions.Sin:   math.sin,
