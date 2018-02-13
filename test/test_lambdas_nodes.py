@@ -418,7 +418,78 @@ def test_Dev():
     e = error(f_(x, y), f0(x, y))
     assert near(e, 0.0), (e, f_(x, y), f0(x, y))
 
-# TODO - these nodes need degree handling 
 # Det
-# Cof
+def test_Det():
+    mesh = UnitSquareMesh(4, 4)
+    y, x = 0.435245, 0.5253525
+    
+    V1 = VectorFunctionSpace(mesh, 'CG', 1)
+    V2 = VectorFunctionSpace(mesh, 'CG', 2)
+
+    v1 = SpatialCoordinate(mesh)
+    v2 = interpolate(Expression(('x[0]*x[1]', 'x[0]-x[1]'), degree=2), V2)
+
+    A = outer(v1, v2)
+    B = outer(v2, v1)
+    A_ = np.array([[x*(x*y), x*(x-y)], [y*(x*y), y*(x-y)]])
+    B_ = np.array([[x*y*(x), x*y*(y)], [(x-y)*x, (x-y)*y]])
+
+    f = det(A + B)
+    f_ = icompile(f)
+    
+    e = error(f_(x, y), np.linalg.det(A_ + B_))
+    assert near(e, 0.0), (e, f_(x, y), np.det(A_ + B_))
+
 # Inverse
+def test_Inv():
+    mesh = UnitSquareMesh(4, 4)
+    y, x = 0.435245, 0.5253525
+    
+    V1 = VectorFunctionSpace(mesh, 'CG', 1)
+    V2 = VectorFunctionSpace(mesh, 'CG', 2)
+
+    v1 = SpatialCoordinate(mesh)
+    v2 = interpolate(Expression(('x[0]*x[1]', 'x[0]-x[1]'), degree=2), V2)
+
+    A = outer(v1, v2)
+    B = outer(v2, v1)
+    A_ = np.array([[x*(x*y), x*(x-y)], [y*(x*y), y*(x-y)]])
+    B_ = np.array([[x*y*(x), x*y*(y)], [(x-y)*x, (x-y)*y]])
+
+    f = inv(A+B)
+    f_ = icompile(f)
+    
+    e = error(f_(x, y), np.linalg.inv(A_+B_).flatten())
+    assert near(e, 0.0, 1E-13), (e, f_(x, y), np.linalg.inv(A_+B_).flatten())
+
+# Cof
+def test_Cofac():
+    mesh = UnitSquareMesh(4, 4)
+    y, x = 0.435245, 0.5253525
+    
+    A_ = np.array([[1, 2], [3, 4]])
+    A = Constant(A_)
+
+    f = cofac(A)
+    f_ = icompile(f)
+    
+    W = TensorFunctionSpace(mesh, 'Real', 0)
+    f = project(f, W)
+
+    e = error(f_(x, y), f(x, y))
+    assert near(e, 0.0, 1E-13), (e, f_(x, y), f(x, y))
+
+    mesh = UnitCubeMesh(4, 4, 3)
+    y, x, z = 0.435245, 0.5253525, 0.1232
+
+    A_ = np.array([[1, 2, 0], [0, 3, 4], [7, 3, 2]])
+    A = Constant(A_)
+
+    f = cofac(A)
+    f_ = icompile(f)
+    
+    W = TensorFunctionSpace(mesh, 'Real', 0)
+    f = project(f, W)
+
+    e = error(f_(x, y, z), f(x, y, z))
+    assert near(e, 0.0, 1E-12), (e, f_(x, y, z), f(x, y, z))

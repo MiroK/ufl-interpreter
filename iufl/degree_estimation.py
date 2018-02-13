@@ -5,6 +5,7 @@ from ufl.algorithms.multifunction import MultiFunction
 from ufl.corealg.map_dag import map_expr_dags
 from ufl.checks import is_cellwise_constant
 from ufl.constantvalue import IntValue
+from dolfin import as_matrix, det, tr, inv
 
 
 class IrreducibleInt(int):
@@ -178,9 +179,46 @@ class SumDegreeEstimator(MultiFunction):
     compound_derivative = _not_handled  # base type
     compound_tensor_operator = _not_handled  # base class
     variable_derivative = _not_handled
-    determinant = _not_handled
-    cofactor = _not_handled
-    inverse = _not_handled
+
+    # Handle by expanding the definiton
+    def determinant(self, v, a):
+        A = v.ufl_operands[0]
+        
+        if A.ufl_shape == (2, 2):
+            fA = abs(A[0, 0]*A[1, 1] - A[0, 1]*A[1, 0])
+        else:
+            fA = abs(A[0, 0]*A[1, 1]*A[2, 2] +\
+                     A[0, 1]*A[1, 2]*A[2, 0] +\
+                     A[1, 0]*A[2, 1]*A[0, 2] -\
+                     A[0, 2]*A[1, 1]*A[2, 0] -\
+                     A[0, 1]*A[1, 0]*A[2, 2] -\
+                     A[1, 2]*A[2, 1]*A[0, 0])
+        return estimate_total_polynomial_degree(fA)
+
+    # Handle by expanding the definition
+    def inverse(self, v, a):
+        A = v.ufl_operands[0]
+
+        if A.ufl_shape == (2, 2):
+            fA = as_matrix(((A[1, 1], -A[0, 1]), (-A[1, 0], A[0, 0])))/det(A)
+        else:
+            assert A.ufl_shape == (3, 3)
+
+            fA = as_matrix(((A[1, 1]*A[2, 2] - A[1, 2]*A[2, 1],
+                             A[0, 2]*A[2, 1] - A[0, 1]*A[2, 2],
+                             A[0, 1]*A[1, 2] - A[0, 2]*A[1, 1]),
+                            (A[1, 2]*A[2, 0] - A[1, 0]*A[2, 2],
+                             A[0, 0]*A[2, 2] - A[0, 2]*A[2, 0],
+                             A[0, 2]*A[1, 0] - A[0, 0]*A[1, 2]),
+                            (A[1, 0]*A[2, 1] - A[1, 1]*A[2, 0],
+                             A[0, 1]*A[2, 0] - A[0, 0]*A[2, 1],
+                             A[0, 0]*A[1, 1] - A[0, 1]*A[1, 0])))/det(A)                            
+        return estimate_total_polynomial_degree(fA)
+    
+    # Handle by expanding the definition
+    def cofactor(self, v, a):
+        A = v.ufl_operands[0]
+        return estimate_total_polynomial_degree(tr(inv(A))*det(A))
     
     trace = _max_degrees
     deviatoric = _max_degrees
