@@ -7,35 +7,46 @@ from cexpr import build_cexpr
 import lambdas
 
 
-def icompile(expression, mesh=None, family='Discontinuous Lagrange'):
+def icompile(expression, mesh=None):
     '''Expression to CEexpresion'''
 
-    print 'icompiling', expression, type(expression)
-    
-    element = get_element(expression)
-    # Here the choice is made to represent everything in a DG space
-    shape = expression.ufl_shape
-    cell = element.cell()
-    # FIXME: to this properly!
-    degree = get_degreee(expression)  # Of output
+    print 'icompiling', expression, type(expression), expression.ufl_shape
 
-    element = construct_element(family, cell, degree, shape)
-    
     if mesh is None: mesh = get_mesh(expression)
     body = lambdas.lambdify(expression, mesh)
+
+    shape = expression.ufl_shape
+    element = get_element(expression)
     
     return build_cexpr(element, shape, body)
 
                             
-def get_element(expr):
+def get_element(expr, family='Discontinuous Lagrange'):
+    '''Construct an element where the expression is to be represented'''
+    # Primitive
     try:
-        return extract_unique_elements(expr)[0]
-    except IndexError:
-        # This typically happens with numbers
-        return get_element(Constant(expr))
-
+        return expr.ufl_element()
+    # Compound
+    except AttributeError:
+        pass
     
-def get_degreee(expr):
+    # There might be more but the should agree on the cell
+    cells = set(elm.cell() for elm in extract_unique_elements(expr))
+    cells.difference_update(set([None]))
+    
+    if cells:
+        assert len(cells) == 1, cells
+        cell = cells.pop()
+    else:
+        cell = None
+            
+    shape = expr.ufl_shape
+    degree = get_degree(expr)
+            
+    return construct_element(family, cell, degree, shape)
+
+        
+def get_degree(expr):
     return estimate_total_polynomial_degree(expr)
 
 

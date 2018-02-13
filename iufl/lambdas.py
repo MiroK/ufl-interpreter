@@ -13,7 +13,9 @@ dolfin.parameters['form_compiler']['no-evaluate_basis_derivatives'] = False
 
 def lambdify(expression, mesh=None):
     '''Compile UFL expression into lambda taking spatial point.'''
-    # NOTE: everything is flat
+    # NOTE: the idea is that the lambda out has the correct shape of the
+    # expression. This is flatten when assigned. This reshape/flatten
+    # is potentially inefficient
     ##################################################################
     # Terminals
     ##################################################################
@@ -24,16 +26,16 @@ def lambdify(expression, mesh=None):
         return lambda x, expression=expression: expression.values().reshape(expression.ufl_shape)
 
     if isinstance(expression, (int, float)):
-        return lambda x, expression=expression: np.array(expression)
+        return lambdify(dolfin.Constant(expression), mesh)
 
     if isinstance(expression, (ufl.algebra.IntValue, ufl.algebra.ScalarValue)):
-        return lambda x, expression=expression: np.array(expression.value())
+        return lambdify(dolfin.Constant(np.array(expression.value())), mesh)
 
     if isinstance(expression, ufl.constantvalue.Identity):
-        return lambda x, expression=expression: np.eye(expression.ufl_shape[0])
+        return lambdify(dolfin.Constant(np.eye(expression.ufl_shape[0])), mesh)
 
     if isinstance(expression, ufl.constantvalue.Zero):
-        return lambda x, expression=expression: np.zeros(expression.ufl_shape)
+        return lambdify(dolfin.Constant(np.zeros(expression.ufl_shape)), mesh)
 
     if isinstance(expression, ufl.geometry.SpatialCoordinate): # Idenity
         return lambda x: np.array(x) if not isinstance(x, np.ndarray) else x
@@ -66,6 +68,7 @@ def lambdify(expression, mesh=None):
     if isinstance(expression, ufl.algebra.Power):
         args = expression.ufl_operands
         first, second = args[0], args[1]
+
         return lambda x, first=first, second=second:\
             lambdify(first, mesh)(x)**lambdify(second, mesh)(x)
 
@@ -74,7 +77,7 @@ def lambdify(expression, mesh=None):
     ##################################################################
     if isinstance(expression, ufl.mathfunctions.MathFunction):
         return lambda x, expression=expression:\
-            FUNCTION_MAP_ONE_ARG[type(expression)](lambdify(expression.ufl_operands[0], mesh)(x))
+            np.array(FUNCTION_MAP_ONE_ARG[type(expression)](lambdify(expression.ufl_operands[0], mesh)(x)))
 
     if isinstance(expression, (ufl.mathfunctions.BesselI, ufl.mathfunctions.BesselY,
                                ufl.mathfunctions.BesselJ, ufl.mathfunctions.BesselK)):
@@ -98,8 +101,14 @@ def lambdify(expression, mesh=None):
                 lambdify(first, mesh)(x) * lambdify(second, mesh)(x)
         # Tensors
         else:
-            return lambda x, first=first, second=second:\
-                np.inner(lambdify(first, mesh)(x), lambdify(second, mesh)(x))
+            assert first.ufl_shape == second.ufl_shape
+            if len(first.ufl_shape) == 1:
+                return lambda x, first=first, second=second: np.array(np.inner(lambdify(first, mesh)(x),
+                                                                               lambdify(second, mesh)(x)))
+            else:
+                return lambda x, first=first, second=second: np.tensordot(lambdify(first, mesh)(x),
+                                                                          lambdify(second, mesh)(x))
+
 
     if isinstance(expression, ufl.tensoralgebra.Dot):
         args = expression.ufl_operands
@@ -116,7 +125,7 @@ def lambdify(expression, mesh=None):
     if isinstance(expression, ufl.tensoralgebra.Cross):
         args = expression.ufl_operands
         first, second = args[0], args[1]
-
+        assert first.ufl_shape == second.ufl_shape == (3, )
         return lambda x, first=first, second=second:\
             np.cross(lambdify(first, mesh)(x), lambdify(second, mesh)(x))
 
@@ -237,7 +246,7 @@ def lambdify(expression, mesh=None):
     if isinstance(expression, ufl.operators.NotCondition):
         arg = expression.ufl_operands[0]
 
-        return lambda x, first=first: not(lambdify(first, mesh)(x))
+        return lambda x, first=arg: not(lambdify(first, mesh)(x))
 
     if isinstance(expression, ufl.operators.Conditional):
         cond, true_v, false_v = expression.ufl_operands
@@ -319,7 +328,8 @@ def lambdify(expression, mesh=None):
         index = extract_slice(shape, indices, free)
         index = flat_index(shape, index)
 
-        return lambda x, f=indexed, index=index, shape=expression.ufl_shape: (f(x)[index]).reshape(shape)
+        shape = expression.ufl_shape
+        return lambda x, f=indexed, index=index, shape=shape: (f(x)[index]).reshape(shape)
     
     # Well that's it for now
     raise ValueError('Unsupported type %s', type(expression))
