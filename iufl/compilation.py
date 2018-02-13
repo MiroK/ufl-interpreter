@@ -9,7 +9,9 @@ import lambdas
 
 def icompile(expression, mesh=None):
     '''Expression to CEexpresion'''
-
+    # Allow for numbers in the system
+    if isinstance(expression, (float, int)): return icompile(Constant(expression), mesh)
+    
     print 'icompiling', expression, type(expression), expression.ufl_shape
 
     if mesh is None: mesh = get_mesh(expression)

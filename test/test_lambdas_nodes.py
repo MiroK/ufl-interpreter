@@ -418,9 +418,7 @@ def test_Dev():
     e = error(f_(x, y), f0(x, y))
     assert near(e, 0.0), (e, f_(x, y), f0(x, y))
 
-    
 # TODO - these nodes need degree handling 
 # Det
 # Cof
 # Inverse
-
