@@ -1,8 +1,8 @@
-from ufl.algorithms.estimate_degrees import estimate_total_polynomial_degree
 from ufl.algorithms import extract_unique_elements
 from ufl.corealg.traversal import traverse_unique_terminals
 from dolfin import (FiniteElement, VectorElement, TensorElement, MixedElement,
                     Function, Constant)
+from degree_estimation import estimate_total_polynomial_degree
 from cexpr import build_cexpr
 import lambdas
 

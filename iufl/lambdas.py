@@ -176,7 +176,7 @@ def lambdify(expression, mesh=None):
         args = expression.ufl_operands
         first = args[0]
 
-        return lambda x, first=first: (lambda A: A - np.trace(A))(lambdify(first, mesh)(x))
+        return lambda x, first=first: (lambda A: A - np.trace(A)*np.eye(len(A))/len(A))(lambdify(first, mesh)(x))
 
     if isinstance(expression, ufl.tensoralgebra.Cofactor):
         args = expression.ufl_operands

@@ -307,13 +307,120 @@ def test_Cross():
     x, y, z = 0.2, 0.123432, 0.2565
     e = error(w_(x, y, z), w0(x, y, z))
     assert near(e, 0.0, 1E-13)
+
+# Transpose
+def test_Transpose():
+    mesh = UnitSquareMesh(4, 4)
+    y, x = 0.128945, 0.97035
+    
+    V1 = VectorFunctionSpace(mesh, 'CG', 1)
+    V2 = VectorFunctionSpace(mesh, 'CG', 2)
+
+    v1 = SpatialCoordinate(mesh)
+    v2 = interpolate(Expression(('x[0]*x[1]', 'x[0]-x[1]'), degree=2), V2)
+
+    A = transpose(outer(v1, v2))#*outer(v1, v2))
+    A_ = np.array([[x*(x*y), x*(x-y)], [y*(x*y), y*(x-y)]])
+
+    f = icompile(A)
+    e = error(f(x, y), (A_.T).flatten())
+    assert near(e, 0.0)
+
+    A = transpose(dot(outer(v1, v2), outer(v1, v2)))
+    A_ = np.array([[x*(x*y), x*(x-y)], [y*(x*y), y*(x-y)]])
+
+    f = icompile(A)
+    e = error(f(x, y), (A_.dot(A_).T).flatten())
+    assert near(e, 0.0), (e, f(x, y), (A_.dot(A_).T).flatten())
+
+# Trace
+def test_Trace():
+    mesh = UnitSquareMesh(4, 4)
+    y, x = 0.128945, 0.97035
+    
+    V1 = VectorFunctionSpace(mesh, 'CG', 1)
+    V2 = VectorFunctionSpace(mesh, 'CG', 2)
+
+    v1 = SpatialCoordinate(mesh)
+    v2 = interpolate(Expression(('x[0]*x[1]', 'x[0]-x[1]'), degree=2), V2)
+
+    A = outer(v1, v2)
+    B = outer(v2, v1)
+    A_ = np.array([[x*(x*y), x*(x-y)], [y*(x*y), y*(x-y)]])
+    B_ = np.array([[x*y*(x), x*y*(y)], [(x-y)*x, (x-y)*y]])
+
+    f = icompile(tr(dot(A, B)))
+    e = error(f(x, y), np.trace(A_.dot(B_)))
+    assert near(e, 0.0)
+
+# Sym
+def test_Sym():
+    mesh = UnitSquareMesh(4, 4)
+    y, x = 0.435245, 0.5253525
+    
+    V1 = VectorFunctionSpace(mesh, 'CG', 1)
+    V2 = VectorFunctionSpace(mesh, 'CG', 2)
+
+    v1 = SpatialCoordinate(mesh)
+    v2 = interpolate(Expression(('x[0]*x[1]', 'x[0]-x[1]'), degree=2), V2)
+
+    A = outer(v1, v2)
+    B = outer(v2, v1)
+    A_ = np.array([[x*(x*y), x*(x-y)], [y*(x*y), y*(x-y)]])
+    B_ = np.array([[x*y*(x), x*y*(y)], [(x-y)*x, (x-y)*y]])
+
+    f = icompile(sym(dot(A, B)))
+    C = A_.dot(B_)
+    e = error(f(x, y), 0.5*(C+C.T).flatten())
+    assert near(e, 0.0)
+
+# Skew
+def test_Skew():
+    mesh = UnitSquareMesh(4, 4)
+    y, x = 0.435245, 0.5253525
+    
+    V1 = VectorFunctionSpace(mesh, 'CG', 1)
+    V2 = VectorFunctionSpace(mesh, 'CG', 2)
+
+    v1 = SpatialCoordinate(mesh)
+    v2 = interpolate(Expression(('x[0]*x[1]', 'x[0]-x[1]'), degree=2), V2)
+
+    A = outer(v1, v2)
+    B = outer(v2, v1)
+    A_ = np.array([[x*(x*y), x*(x-y)], [y*(x*y), y*(x-y)]])
+    B_ = np.array([[x*y*(x), x*y*(y)], [(x-y)*x, (x-y)*y]])
+
+    f = icompile(skew(dot(A, B)))
+    C = A_.dot(B_)
+    e = error(f(x, y), 0.5*(C-C.T).flatten())
+    assert near(e, 0.0)
+
+# Dev
+def test_Dev():
+    mesh = UnitSquareMesh(4, 4)
+    y, x = 0.435245, 0.5253525
+    
+    V1 = VectorFunctionSpace(mesh, 'CG', 1)
+    V2 = VectorFunctionSpace(mesh, 'CG', 2)
+
+    v1 = SpatialCoordinate(mesh)
+    v2 = interpolate(Expression(('x[0]*x[1]', 'x[0]-x[1]'), degree=2), V2)
+
+    A = outer(v1, v2)
+    B = outer(v2, v1)
+    
+    f = dev(dot(A, B))
+    f_ = icompile(f)
+
+    T = FunctionSpace(mesh, f_.ufl_element())
+    f0 = project(f_, T)
+    
+    e = error(f_(x, y), f0(x, y))
+    assert near(e, 0.0), (e, f_(x, y), f0(x, y))
+
     
 # TODO - these nodes need degree handling 
 # Det
 # Cof
 # Inverse
-# Transpose
-# Trace
-# Sym
-# Skew
-# Dev
+
