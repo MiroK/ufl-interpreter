@@ -65,7 +65,6 @@ def eval_grad_expr(foo, mesh):
         cell = dolfin.Cell(mesh, cell_id)
         coordinate_dofs = cell.get_vertex_coordinates()
 
-        print foo, type(foo), foo.ufl_element()
         shape = dolfin.grad(foo).ufl_shape
         # grad grad grad ... ntime is stored in
         nslots = np.prod(shape)
@@ -131,7 +130,6 @@ def eval_div(arg, mesh):
     grad_ = dolfin.grad(arg)
     grad = compilation.icompile(grad_, mesh)
 
-    print '?', arg.ufl_shape
     # Consistency with UFL behavior
     if len(arg.ufl_shape) == 0:
         return lambda x, g=grad: g(x)

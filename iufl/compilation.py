@@ -13,7 +13,7 @@ def icompile(expression, mesh=None):
     # Allow for numbers in the system
     if isinstance(expression, (float, int)): return icompile(Constant(expression), mesh)
     
-    print 'icompiling', expression, type(expression), expression.ufl_shape, 'with', mesh
+    # print 'icompiling', expression, type(expression), expression.ufl_shape, 'with', mesh
 
     if mesh is None: mesh = get_mesh(expression)
     

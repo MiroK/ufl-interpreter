@@ -305,32 +305,38 @@ def lambdify(expression, mesh=None):
         indexed_, index = expression.ufl_operands
 
         indexed = compilation.icompile(indexed_, mesh)
+
         shape = indexed.ufl_shape
         index = extract_index(index)
         index = flat_index(shape, index)
-        return lambda x, indexed=indexed, index=index: np.array(indexed(x).item(index))
+        return lambda x, indexed=indexed, index=index: np.array(indexed(x)[index])
 
     if isinstance(expression, ufl.tensors.ListTensor):
 
         comps = [compilation.icompile(arg, mesh) for arg in expression.ufl_operands]
         return lambda x, comps=comps: np.array([f(x).reshape(f.ufl_shape) for f in comps])
 
-
     if isinstance(expression, ufl.tensors.ComponentTensor):
-        # The first thing better be Indexed
+        # FIXME: Might have gottern here by index sum
         indexed, free = expression.ufl_operands
+        # The first thing better be Indexed
         assert isinstance(indexed, ufl.indexed.Indexed)
         # What, slicing ...
         indexed, indices = indexed.ufl_operands
         # Compile the function to be indexed
         indexed = compilation.icompile(indexed, mesh)
-
         # Figure out how to slice it
         shape = indexed.ufl_shape
-        index = extract_slice(shape, indices, free)
-        index = flat_index(shape, index)
+        # NOTE: Mixed element which we use for higher order require a bit
+        # of care because their ufl_shape is flatten but we want to preserve
+        # the structucture
+        tshape = tuple_shape(indexed)
+        index = extract_slice(tshape, indices, free)
+        print 'slice', index
+        index = flat_index(tshape, index)
 
         shape = expression.ufl_shape
+        print 'As', shape, index
         return lambda x, f=indexed, index=index, shape=shape: (f(x)[index]).reshape(shape)
     
     # Well that's it for now
@@ -364,15 +370,35 @@ def extract_slice(shape, indices, free):
 
     indices = extract_index(indices)
     free = extract_index(free)
-
-    return tuple(range(shape[i]) if index in free else index
+    print shape, indices, free
+    return tuple(slice(shape[i]) if index in free else index
                  for i, index in enumerate(indices))
 
 
 def flat_index(shape, index):
-    return np.ravel_multi_index(index, shape)
+    '''(2, 2), [0, 1] -> 1'''
+    assert len(shape) == len(index)
+    return (np.arange(np.prod(shape)).reshape(shape)[index]).flatten()
 
 
+def tuple_shape(expr):
+    '''Shape for spaces of rank-k tensors'''
+    elm = expr.ufl_element()
+
+    def elm_shape(elm):
+        if isinstance(elm, (dolfin.FiniteElement, dolfin.VectorElement, dolfin.TensorElement)):
+            return elm.value_shape()
+        else:
+            assert isinstance(elm, dolfin.MixedElement)
+            subelms = set(elm.sub_elements())
+            assert len(subelms) == 1
+        
+            n = elm.num_sub_elements()
+            elm = subelms.pop()
+            return (n, ) + elm_shape(elm)
+        
+    return elm_shape(elm)
+        
 # Representation of ufl nodes that are MathFunctions of one argument
 FUNCTION_MAP_ONE_ARG = {ufl.mathfunctions.Sin:   math.sin,
                         ufl.mathfunctions.Cos:   math.cos,
@@ -394,56 +420,3 @@ FUNCTION_MAP_TWO_ARG = {ufl.mathfunctions.BesselI: (sp.iv, sp.iv),
                         ufl.mathfunctions.BesselY: (sp.yv, sp.yn),
                         ufl.mathfunctions.BesselJ: (sp.jv, sp.jn),
                         ufl.mathfunctions.BesselK: (sp.kv, sp.kn)}
-
-# ----------------------------------------------------------------------------------------
-
-if __name__ == '__main__':
-    from dolfin import *
-    parameters['form_compiler']['no-evaluate_basis_derivatives'] = False
-
-    u = Constant(3)
-
-    mesh = UnitSquareMesh(10, 10)
-    V = FunctionSpace(mesh, 'CG', 1)
-    v = interpolate(Expression('x[0]+x[1]', degree=1), V)
-    
-    print lambdify(curl(v))((0.5, 0.5))
-
-    V = VectorFunctionSpace(mesh, 'CG', 2)
-    f = Expression(('x[0]*x[0]', '2*x[1]*x[0]'), degree=2)
-    v = interpolate(f, V)
-
-    print lambdify(curl(v))((0.5, 0.5))
-
-    #print lambdify(Constant(((1, 2), (3, 4)))[0, 0])((0.5, 0.5))
-    #print lambdify(inv(sym(grad(v)))+Constant(((1, 0), (0, 1))))((0.5, 0.5))
-
-    A = Constant(((1, 0), (2, 3)))
-    B = Constant(((2, 0), (2, 3)))
-    v = Constant((1, 0))
-
-    mesh = UnitCubeMesh(3, 3, 3)
-    V = VectorFunctionSpace(mesh, 'CG', 2)
-    f = interpolate(Expression(('-x[1]', 'x[0]', 'x[2]'), degree=1), V)
-
-    print lambdify(curl(f))((0.5, 0.5, 0.5))
-
-    # FIXME: things such as CellVolume
-
-    # FIXME: differentiation
-    # FIXME: wrapping as Expression, eval_cell?, cpp Expression
-
-    # READ SICC: interpreters
-
-    # ComponentTensor, Div, as_matrix, as_vector
-
-    # HOWTO
-    # In [4]: f = Expression('x[0]', element=V.ufl_element())
-
-    # In [5]: import ufl
-
-    # In [6]: ufl.algorithms.estimate_degrees.estimate_total_polynomial_degree(f)
-    # Out[6]: 1
-
-    # In [7]: ufl.algorithms.extract_unique_elements(f)
-    # Out[7]: (FiniteElement('Lagrange', triangle, 1),)

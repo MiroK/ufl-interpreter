@@ -5,7 +5,10 @@ import numpy as np
 import pytest
 
 
-def error(a, b): return np.linalg.norm(a - b)
+def error(a, b):
+    a = np.asarray(a).flatten()
+    b = np.asarray(b).flatten()
+    return np.linalg.norm(a - b)
 
 
 # Sum
@@ -193,7 +196,7 @@ def test_Dot():
     f = dot(A, B)
     f_ = icompile(f)
 
-    e = error(f_(x, y), np.dot(A_, B_).flatten())
+    e = error(f_(x, y), np.dot(A_, B_))
     assert near(e, 0.0), e
     
 # Outer
@@ -226,20 +229,20 @@ def test_Outer():
     A_ = np.array([[x*(x*y), x*(x-y)], [y*(x*y), y*(x-y)]])
 
     f = icompile(A)
-    e = error(f(x, y), A_.flatten())
-    assert near(e, 0.0), (e, f_(x, y), A_.flatten())
+    e = error(f(x, y), A_)
+    assert near(e, 0.0), (e, f_(x, y), A_)
 
     B = outer(v2, v1)
     B_ = np.array([[x*y*(x), x*y*(y)], [(x-y)*x, (x-y)*y]])
 
     f = icompile(B)
-    e = error(f(x, y), B_.flatten())
+    e = error(f(x, y), B_)
     assert near(e, 0.0), e
 
     C = outer(A, B)
 
     f = icompile(C)
-    e = error(f(x, y), np.outer(A_, B_).flatten())
+    e = error(f(x, y), np.outer(A_, B_))
     assert near(e, 0.0), e
 
 # Conditionals
@@ -323,15 +326,15 @@ def test_Transpose():
     A_ = np.array([[x*(x*y), x*(x-y)], [y*(x*y), y*(x-y)]])
 
     f = icompile(A)
-    e = error(f(x, y), (A_.T).flatten())
+    e = error(f(x, y), (A_.T))
     assert near(e, 0.0)
 
     A = transpose(dot(outer(v1, v2), outer(v1, v2)))
     A_ = np.array([[x*(x*y), x*(x-y)], [y*(x*y), y*(x-y)]])
 
     f = icompile(A)
-    e = error(f(x, y), (A_.dot(A_).T).flatten())
-    assert near(e, 0.0), (e, f(x, y), (A_.dot(A_).T).flatten())
+    e = error(f(x, y), (A_.dot(A_).T))
+    assert near(e, 0.0), (e, f(x, y), (A_.dot(A_).T))
 
 # Trace
 def test_Trace():
@@ -371,7 +374,7 @@ def test_Sym():
 
     f = icompile(sym(dot(A, B)))
     C = A_.dot(B_)
-    e = error(f(x, y), 0.5*(C+C.T).flatten())
+    e = error(f(x, y), 0.5*(C+C.T))
     assert near(e, 0.0)
 
 # Skew
@@ -392,7 +395,7 @@ def test_Skew():
 
     f = icompile(skew(dot(A, B)))
     C = A_.dot(B_)
-    e = error(f(x, y), 0.5*(C-C.T).flatten())
+    e = error(f(x, y), 0.5*(C-C.T))
     assert near(e, 0.0)
 
 # Dev
@@ -459,8 +462,8 @@ def test_Inv():
     f = inv(A+B)
     f_ = icompile(f)
     
-    e = error(f_(x, y), np.linalg.inv(A_+B_).flatten())
-    assert near(e, 0.0, 1E-13), (e, f_(x, y), np.linalg.inv(A_+B_).flatten())
+    e = error(f_(x, y), np.linalg.inv(A_+B_))
+    assert near(e, 0.0, 1E-13), (e, f_(x, y), np.linalg.inv(A_+B_))
 
 # Cof
 def test_Cofac():
