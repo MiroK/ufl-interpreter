@@ -49,8 +49,8 @@ def eval_grad_expr(foo, mesh):
     # The idea is to compute df  as sum c_k dphi_k    
     def evaluate(x, foo=foo, mesh=mesh):
         x = np.fromiter(x, dtype=float)
+        ufl_element = compilation.get_element(foo, mesh)
 
-        ufl_element = compilation.get_element(foo)
         # NOTE: this is here to make evaluating dofs simpler. Too lazy
         # now to handle Hdiv and what not
         assert ufl_element.family() in ('Lagrange', 'Discontinuous Lagrange')
@@ -65,6 +65,7 @@ def eval_grad_expr(foo, mesh):
         cell = dolfin.Cell(mesh, cell_id)
         coordinate_dofs = cell.get_vertex_coordinates()
 
+        print foo, type(foo), foo.ufl_element()
         shape = dolfin.grad(foo).ufl_shape
         # grad grad grad ... ntime is stored in
         nslots = np.prod(shape)
@@ -115,11 +116,11 @@ def eval_curl(arg, mesh):
         # vector -> div(R expr) = scalar
         # NOTE: I don't want to reshape grad to 2x2 and index then
         # so this is vector indexing
-        return lambda x, g=grad: (lambda G: G[1]-G[2])(g(x))
+        return lambda x, g=grad: (lambda G: G[2]-G[1])(g(x))
 
     if arg.ufl_shape == (3, ):
         # The usual stuff
-        return lambda x, g=grad: (lambda G: np.array([G[5]-G[7], G[6]-G[2], G[1]-G[3]]))(g(x))
+        return lambda x, g=grad: (lambda G: np.array([G[7]-G[5], G[2]-G[6], G[3]-G[1]]))(g(x))
     
     assert False
 
@@ -136,7 +137,7 @@ def eval_div(arg, mesh):
         return lambda x, g=grad: g(x)
     # Vector
     if len(arg.ufl_shape) == 1:
-        n = arg[0]
+        n = arg.ufl_shape[0]
         assert n in (2, 3)
 
         if n == 2:

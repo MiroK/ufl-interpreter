@@ -1,5 +1,6 @@
 from ufl.algorithms import extract_unique_elements
 from ufl.corealg.traversal import traverse_unique_terminals
+from ufl.geometry import SpatialCoordinate
 from dolfin import (FiniteElement, VectorElement, TensorElement, MixedElement,
                     Function, Constant)
 from degree_estimation import estimate_total_polynomial_degree
@@ -12,39 +13,50 @@ def icompile(expression, mesh=None):
     # Allow for numbers in the system
     if isinstance(expression, (float, int)): return icompile(Constant(expression), mesh)
     
-    print 'icompiling', expression, type(expression), expression.ufl_shape
+    print 'icompiling', expression, type(expression), expression.ufl_shape, 'with', mesh
 
     if mesh is None: mesh = get_mesh(expression)
+    
     body = lambdas.lambdify(expression, mesh)
-
     shape = expression.ufl_shape
-    element = get_element(expression)
+    element = get_element(expression, mesh)
     
     return build_cexpr(element, shape, body)
 
                             
-def get_element(expr, family='Discontinuous Lagrange'):
+def get_element(expr, mesh=None, family='Discontinuous Lagrange'):
     '''Construct an element where the expression is to be represented'''
     # Primitive
     try:
-        return expr.ufl_element()
+        elm = expr.ufl_element()
     # Compound
     except AttributeError:
-        pass
-    
-    # There might be more but the should agree on the cell
-    cells = set(elm.cell() for elm in extract_unique_elements(expr))
-    cells.difference_update(set([None]))
-    
-    if cells:
-        assert len(cells) == 1, cells
-        cell = cells.pop()
+        elm = None
+
+    # Reconstruct
+    if elm is None:
+        shape = expr.ufl_shape
+        degree = get_degree(expr)
+        
+        # There might be more but the should agree on the cell
+        cells = set(elm.cell() for elm in extract_unique_elements(expr))
+        cells.difference_update(set([None]))
+
+        if cells:
+            assert len(cells) == 1, cells
+            cell = cells.pop()
+        else:
+            cell = None
+    # Extract
     else:
-        cell = None
-            
-    shape = expr.ufl_shape
-    degree = get_degree(expr)
-            
+        shape = elm.value_shape()
+        degree = elm.degree()
+        cell = elm.cell()
+
+    # Promote
+    if mesh is not None and cell is None:
+        cell = mesh.ufl_cell()
+    
     return construct_element(family, cell, degree, shape)
 
         
@@ -54,7 +66,6 @@ def get_degree(expr):
 
 def get_mesh(expr):
     for arg in traverse_unique_terminals(expr):
-        # print 'Arg', arg, type(arg)
         if isinstance(arg, Function):
             return arg.function_space().mesh()
     return None
