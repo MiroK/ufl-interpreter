@@ -1,4 +1,4 @@
-from dolfin import VectorElement, TensorElement
+from dolfin import VectorElement, TensorElement, inv
 from scipy.linalg import svdvals, eigvals, eig
 import numpy as np
 import compilation, cexpr
@@ -16,7 +16,8 @@ def eigw(expr, mesh=None):
     assert len(expr.ufl_shape) == 2, 'Matrix valued expression expected'
     
     n, m = expr.ufl_shape
-    degree = expr.ufl_element().degree()
+    # Estimate the degree as matrix inverse
+    degree = compilation.get_degree(inv(expr))
     family = expr.ufl_element().family()
     cell = expr.ufl_element().cell()
     
@@ -45,7 +46,9 @@ def eigv(expr, mesh=None):
     n, m = expr.ufl_shape
     assert m == n, 'Square matrix expected'
     
-    degree = expr.ufl_element().degree()
+    # Estimate the degree as matrix inverse
+    degree = compilation.get_degree(inv(expr))
+
     family = expr.ufl_element().family()
     cell = expr.ufl_element().cell()
     

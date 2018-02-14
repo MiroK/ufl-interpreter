@@ -332,11 +332,9 @@ def lambdify(expression, mesh=None):
         # the structucture
         tshape = tuple_shape(indexed)
         index = extract_slice(tshape, indices, free)
-        print 'slice', index
         index = flat_index(tshape, index)
 
         shape = expression.ufl_shape
-        print 'As', shape, index
         return lambda x, f=indexed, index=index, shape=shape: (f(x)[index]).reshape(shape)
     
     # Well that's it for now
@@ -370,7 +368,6 @@ def extract_slice(shape, indices, free):
 
     indices = extract_index(indices)
     free = extract_index(free)
-    print shape, indices, free
     return tuple(slice(shape[i]) if index in free else index
                  for i, index in enumerate(indices))
 

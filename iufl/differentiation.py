@@ -153,4 +153,3 @@ def eval_div(arg, mesh):
     return lambda x, g=grad, I=identity, N=np.prod(out_shape):(
         lambda G, I=I: np.array([np.inner(Gi, I) for Gi in G])
         )(g(x).reshape((N, -1)))
-
