@@ -43,6 +43,11 @@ def lambdify(expression, mesh=None):
     ##################################################################
     # Algebra
     ##################################################################
+    if isinstance(expression, ufl.algebra.Abs):
+        args = expression.ufl_operands
+        first = args[0]
+        return lambda x, first=first: abs(lambdify(first, mesh)(x))
+    
     if isinstance(expression, ufl.algebra.Sum):
         args = expression.ufl_operands
         first, second = args[0], args[1]
