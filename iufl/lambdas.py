@@ -307,14 +307,20 @@ def lambdify(expression, mesh=None):
     # Indexing (limited)
     ##################################################################
     if isinstance(expression, ufl.indexed.Indexed):
-        indexed_, index = expression.ufl_operands
+        indexed_, indices = expression.ufl_operands
 
         indexed = compilation.icompile(indexed_, mesh)
 
         shape = indexed.ufl_shape
-        index = extract_index(index)
-        index = flat_index(shape, index)
-        return lambda x, indexed=indexed, index=index: np.array(indexed(x)[index])
+
+        index = tuple(slice(l) if isinstance(index, ufl.indexed.Index) else int(index)
+                      for l, index in zip(shape, indices))
+
+        indexed_shape = indexed.ufl_element().value_shape()
+
+        return lambda x, indexed=indexed, index=index, ishape=indexed_shape: (
+            np.array(indexed(x).reshape(ishape)[index])
+        )
 
     if isinstance(expression, ufl.tensors.ListTensor):
 
@@ -324,8 +330,9 @@ def lambdify(expression, mesh=None):
     if isinstance(expression, ufl.tensors.ComponentTensor):
         # FIXME: Might have gottern here by index sum
         indexed, free = expression.ufl_operands
-        # The first thing better be Indexed
-        assert isinstance(indexed, ufl.indexed.Indexed)
+        if not isinstance(indexed, ufl.indexed.Indexed):
+            return lambdify(indexed)
+
         # What, slicing ...
         indexed, indices = indexed.ufl_operands
         # Compile the function to be indexed
@@ -336,11 +343,15 @@ def lambdify(expression, mesh=None):
         # of care because their ufl_shape is flatten but we want to preserve
         # the structucture
         tshape = tuple_shape(indexed)
-        index = extract_slice(tshape, indices, free)
-        index = flat_index(tshape, index)
+        index = tuple(slice(l) if isinstance(index, ufl.indexed.Index) else int(index)
+                      for l, index in zip(tshape, indices))
+
+        indexed_shape = indexed.ufl_element().value_shape()
 
         shape = expression.ufl_shape
-        return lambda x, f=indexed, index=index, shape=shape: (f(x)[index]).reshape(shape)
+        return lambda x, f=indexed, index=index, shape=shape, ishape=indexed_shape: (
+            (f(x).reshape(ishape)[index]).reshape(shape)
+        )
     
     # Well that's it for now
     raise ValueError('Unsupported type %s', type(expression))
@@ -348,40 +359,6 @@ def lambdify(expression, mesh=None):
 ######################################################################
 # AUXILIARY MATHOD/DATA
 ######################################################################
-
-def extract_index(index):
-    '''UFL index to int or list of int'''
-    if isinstance(index, ufl.core.multiindex.FixedIndex):
-        return int(index)
-
-    if isinstance(index, ufl.core.multiindex.Index):
-        return index.count()
-    
-    elif isinstance(index, ufl.core.multiindex.MultiIndex):
-        return tuple(map(extract_index, index.indices()))
-
-    raise ValueError('Unable to extract index from %s', type(index))
-
-
-def extract_slice(shape, indices, free):
-    '''
-    Slice of values with given shape determined by free index in indices.
-    '''
-    assert isinstance(indices, ufl.core.multiindex.MultiIndex)
-    assert isinstance(indices, ufl.core.multiindex.MultiIndex)
-    assert len(free) < len(indices)
-
-    indices = extract_index(indices)
-    free = extract_index(free)
-    return tuple(slice(shape[i]) if index in free else index
-                 for i, index in enumerate(indices))
-
-
-def flat_index(shape, index):
-    '''(2, 2), [0, 1] -> 1'''
-    assert len(shape) == len(index)
-    return (np.arange(np.prod(shape)).reshape(shape)[index]).flatten()
-
 
 def tuple_shape(expr):
     '''Shape for spaces of rank-k tensors'''
